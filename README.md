@@ -1,15 +1,24 @@
-# Meu Primeiro Laboratório DBA - PostgreSQL 🚀
+# 🛒 Sistema de Vendas & Governança de Dados (MySQL)
 
-Repositório criado para documentar minha evolução prática e rotinas de Administração de Banco de Dados.
+Este repositório apresenta um projeto corporativo completo de modelagem de banco de dados relacional e controle de privilégios de segurança de nível sênior (Data Governance), gerenciado de forma otimizada via **DBeaver**.
 
-## 🛠️ Tecnologias Utilizadas
-* **SGBD:** PostgreSQL 18
-* **Interface Visual:** DBeaver Community
-* **Ambiente:** Windows 11 (Laboratório Local)
+## 📊 Cenário de Negócio
+O sistema foi desenvolvido para gerenciar as operações de vendas de periféricos de informática (Mouses e Teclados).
+* **Cliente/Comprador cadastrado:** Carlos (`carlos@email.com`)
+* **Produtos estruturados:** Mouse para Computador e Teclado Mecânico com controle dinâmico de estoque.
 
-## 📊 O que foi desenvolvido na prática:
-1. **Modelagem e Estrutura (DDL):** Criação do banco de dados `loja_ficticia` e tabelas estruturadas com Chaves Primárias e Relacionamentos (Chaves Estrangeiras).
-2. **Manipulação de Dados (DML):** Prática com comandos de inserção (`INSERT`), consultas avançadas com junções (`INNER JOIN`), e atualizações seguras (`UPDATE` com filtros `WHERE`).
-3. **Qualidade de Dados:** Identificação e limpeza de registros redundantes e duplicados através de comandos de exclusão (`DELETE` estruturado).
-4. **Segurança de Acesso (DCL):** Criação de novos usuários de sistema (`CREATE USER`) e controle rígido de privilégios e permissões de leitura (`GRANT SELECT`).
-5. **Continuidade de Negócios (Backup):** Geração e extração com sucesso de arquivos de segurança física (Dump de dados) para proteção do patrimônio de informações.
+## 📁 Arquitetura e Organização do Projeto (Padrão de Mercado)
+Seguindo as melhores práticas de Engenharia de Dados, o projeto foi segmentado de forma modular em scripts ordenados:
+
+*   `01_schema.sql`: Definição da estrutura física de dados (DDL), chaves primárias e relacionamentos via chaves estrangeiras (*Foreign Keys*).
+*   `02_seed.sql`: Carga inicial de dados de teste (DML) para simulação de vendas em ambiente de homologação.
+*   `03_security.sql`: Implementação das políticas de controle de acesso ao banco (DCL).
+*   `docker-compose.yml`: Arquivo de automação de infraestrutura preparado para inicialização rápida do banco de dados em contêineres Docker.
+
+## 🔐 Política de Segurança & LGPD (Menor Privilégio)
+Para garantir a integridade dos dados organizacionais, a funcionária **Maria (Vendedora)** recebeu um perfil estritamente restrito:
+* Possui acesso apenas para consultar produtos, clientes e registrar novas linhas de vendas (`SELECT` e `INSERT`).
+* Ela **não possui privilégios** para alterar estruturas de tabelas ou remover registros cruciais (`DROP`, `DELETE` ou `ALTER` bloqueados).
+
+---
+*Desenvolvido como projeto de portfólio para demonstração de competências como Administrador de Banco de Dados (DBA).*
