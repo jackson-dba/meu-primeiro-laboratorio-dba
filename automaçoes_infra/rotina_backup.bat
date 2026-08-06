@@ -1,64 +1,126 @@
 @echo off
 setlocal enabledelayedexpansion
-:: ====================================================================
-:: PROJETO: MERCADO FICTÍCIO (AUTOMAÇÃO DE BACKUP BLINDADA - DBA)
-:: DESCRIÇÃO: SCRIPT PORTÁTIL INDESTRUTÍVEL PARA INSTALAÇÕES REAIS
-:: ====================================================================
 
-:: 1. CONFIGURAÇÃO DE DIRETÓRIOS E BANCO (NOME DA PASTA SEM ESPAÇOS)
-set JALON_DIR="%~dp0backups_mercado"
-set DATABASE=mercado_ficticio
-set USER=postgres
-set PGPASSWORD=adm1228
+:: =========================================================================
+:: PRONTO: MERCADO FICTÍCIO (AUTOMAÇÃO DE BACKUP HÍBRIDA - DBA)
+:: DESCRIÇÃO: SCRIPT UNIVERSAL PORTÁVEL (SEM LETRA DE DISCO FIXA) COM LOGS
+:: =========================================================================
+
+:: 1. CONFIGURAÇÃO DE DIRETÓRIOS E BANCO (CAMINHO RELATIVO DO DISCO ATUAL)
+:: %~dp0 identifica automaticamente onde o script está rodando (Ex: C:\pasta\ ou D:\teste\)
+set "JALON_DIR=%~dp0dpBackups_mercado"
+set "DATABASE=mercado_ficticio"
+
+echo ===================================================
+echo          PARAMETROS DE ACESSO AO POSTGRES
+echo ===================================================
+
+:: Pergunta o usuário. Se deixar em branco e apertar Enter, o padrão será 'postgres'
+set "USER="
+set /p "USER=Digite o usuario do banco [Padrao: postgres]: "
+if "%USER%"=="" set "USER=postgres"
+
+:: Pergunta a senha de forma interativa
+echo Digite a senha do banco de dados:
+set /p PGPASSWORD=
+echo ===================================================
 
 :: 2. GARANTIA DE INFRAESTRUTURA
-if not exist !JALON_DIR! (
+if not exist "%JALON_DIR%" (
     echo [NÍVEL DBA] Criando pasta de destino automaticamente...
-    md !JALON_DIR!
+    md "%JALON_DIR%"
 )
 
-:: 3. DETECÇÃO AUTOMÁTICA E DINÂMICA DO PG_DUMP
-echo [NÍVEL DBA] Localizando utilitario pg_dump no sistema...
+:: Cria ou limpa o arquivo de relatório de hoje
+set "LOG_FILE=%JALON_DIR%\relatorio_backup.txt"
+echo =================================================== > "%LOG_FILE%"
+echo RELATÓRIO DE EXECUÇÃO DO BACKUP - %DATE% %TIME% >> "%LOG_FILE%"
+echo =================================================== >> "%LOG_FILE%"
+
+
+:: 3. DETECÇÃO AUTOMÁTICA ULTRA RESILIENTE DO AMBIENTE
+echo [NÍVEL DBA] Localizando ambiente do PostgreSQL...
+
 set "PG_EXEC="
+set "DOCKER_MODE=N"
 
-for /f "delims=" %%i in ('where pg_dump.exe 2^>nul') do set "PG_EXEC="%%i""
-
+:: Passo A: Procura o pg_dump tradicional instalado no Windows
+for /d %%I in ("C:\Program Files\PostgreSQL\*") do (
+    if exist "%%I\bin\pg_dump.exe" set "PG_EXEC=%%I\bin\pg_dump.exe"
+)
 if not defined PG_EXEC (
-    for %%d in (C D) do (
-        if exist "%%d:\" (
-            for /f "delims=" %%f in ('dir /b /s "%%d:\pg_dump.exe" 2^>nul') do (
-                set "PG_EXEC="%%f""
-                goto :encontrado
-            )
+    for /d %%I in ("C:\Arquivos de Programas\PostgreSQL\*") do (
+        if exist "%%I\bin\pg_dump.exe" set "PG_EXEC=%%I\bin\pg_dump.exe"
+    )
+)
+if not defined PG_EXEC (
+    for /d %%I in ("C:\Program Files (x86)\PostgreSQL\*") do (
+        if exist "%%I\bin\pg_dump.exe" set "PG_EXEC=%%I\bin\pg_dump.exe"
+    )
+)
+
+:: Passo B: Se nao achou local, busca no Docker de forma genérica pela imagem usada (ancestor)
+if not defined PG_EXEC (
+    where docker >nul 2>nul
+    if %errorlevel% equ 0 (
+        :: Filtra por containers gerados a partir de qualquer versão da imagem oficial do postgres
+        for /f "tokens=*" %%A in ('docker ps -a --filter "ancestor=postgres" --format "{{.Names}}" 2^>nul') do (
+            set "PG_EXEC=%%A"
+            set "DOCKER_MODE=S"
         )
     )
 )
 
-:encontrado
+:: Passo C: Se mesmo assim nao achou nada, gera erro no relatório e fecha
 if not defined PG_EXEC (
-    echo [ERRO CRÍTICO] pg_dump.exe nao encontrado no sistema.
-    goto :fim
+    echo [ERRO] PostgreSQL nao localizado no sistema. >> "%LOG_FILE%"
+    cls
+    echo ===================================================
+    echo             FALHA GRAVE NO PROCESSO
+    echo ===================================================
+    echo O script nao encontrou o PostgreSQL no Windows nem no Docker.
+    echo O motivo detalhado foi salvo no relatorio em:
+    echo "%LOG_FILE%"
+    echo ===================================================
+    pause
+    exit /b
 )
 
-echo [SUCESSO] Utilitario encontrado em: !PG_EXEC!
 
-:: 4. GERAÇÃO DO TIMESTAMP BLINDADO (REMOVE ESPAÇOS, DOIS PONTOS E BARRAS)
-set DATA=%date:~-4%-%date:~3,2%-%date:~0,2%
-set HORA=%time:~0,2%-%time:~3,2%
-set HORA=!HORA: =0!
-set HORA=!HORA::=-!
-set HORA=!HORA:/=-!
-set ARQUIVO_FINAL=%DATABASE%_%DATA%_%HORA%.sql
-
-:: 5. EXECUÇÃO DO BACKUP COM ASPAS DE SEGURANÇA REFORÇADAS
-echo [NÍVEL DBA] Iniciando extracao de dados do banco %DATABASE%...
-!PG_EXEC! -U %USER% -d %DATABASE% -F p -f "!JALON_DIR!\%ARQUIVO_FINAL%"
-
-if !errorlevel! equ 0 (
-    echo [SUCESSO] Backup gravado com exito em: !JALON_DIR!\%ARQUIVO_FINAL%
+:: 4. EXECUÇÃO DO BACKUP CONFORME O MODO ENCONTRADO
+if "%DOCKER_MODE%"=="S" (
+    echo [SUCESSO] Usando ambiente Docker (Container: %PG_EXEC%)
+    echo [INFO] Garantindo inicializacao do container...
+    docker start %PG_EXEC% >nul 2>nul
+    timeout /t 2 >nul
+    
+    :: Executa o backup de dentro do Docker jogando para a pasta local relativizada
+    docker exec -t %PG_EXEC% pg_dump -U %USER% %DATABASE% > "%JALON_DIR%\backup_%DATABASE%.sql" 2>> "%LOG_FILE%"
 ) else (
-    echo [ERRO] Ocorreu uma falha durante a execucao do pg_dump.
+    echo [SUCESSO] Usando utilitário local do Windows.
+    "%PG_EXEC%" -U %USER% -F c -b -v -f "%JALON_DIR%\backup_%DATABASE%.backup" %DATABASE% 2>> "%LOG_FILE%"
 )
 
-:fim
+
+:: 5. VERIFICAÇÃO FINAL E EXIBIÇÃO DO RELATÓRIO
+if %errorlevel% equ 0 (
+    echo STATUS: BACKUP REALIZADO COM SUCESSO! >> "%LOG_FILE%"
+    set "RESULTADO=SUCESSO"
+) else (
+    echo STATUS: ERRO AO EXECUTAR O COMANDO PG_DUMP. >> "%LOG_FILE%"
+    set "RESULTADO=ERRO"
+)
+
+cls
+echo ===================================================
+echo          EXECUÇÃO FINALIZADA (%RESULTADO%)
+echo ===================================================
+echo Visualizando o relatorio gerado (Feche o bloco de notas para encerrar):
+echo.
+
+:: Abre o relatório automaticamente na tela para o usuário ler antes do script fechar
+notepad "%LOG_FILE%"
+
+echo ===================================================
+echo Script encerrado de forma segura.
 pause
